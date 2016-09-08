@@ -902,6 +902,8 @@ static int producer_conf_set_special (Producer *self, rd_kafka_conf_t *conf,
 
 	if (!strcasecmp(name, "on_delivery")) {
 		if (!PyCallable_Check(valobj)) {
+			cfl_PyErr_Format(
+				RD_KAFKA_RESP_ERR__INVALID_ARG,
 				"%s requires a callable "
 				"object", name);
 			return -1;
