@@ -166,6 +166,7 @@ typedef struct {
 		const rd_kafka_topic_t *,
 		const void *, size_t, int32_t,
 		void *, void *);  /**< Fallback C partitioner*/
+	PyObject *on_stats;     /* Stat callback */
 	int callback_crashed;
 	PyThreadState *thread_state;
 } Producer;
