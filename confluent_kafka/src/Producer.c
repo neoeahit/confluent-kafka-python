@@ -97,6 +97,10 @@ static int Producer_clear (Producer *self) {
 		Py_DECREF(self->partitioner_cb);
 		self->partitioner_cb = NULL;
 	}
+	if (self->on_stats) {
+		Py_DECREF(self->on_stats);
+		self->on_stats = NULL;
+	}
 	return 0;
 }
 
@@ -481,6 +485,44 @@ PyTypeObject ProducerType = {
 };
 
 
+static int Producer_stats_cb (rd_kafka_t *rk, char *json,
+				   size_t json_len, void *opaque) {
+    Consumer *self = opaque;
+    PyObject *args, *result;
+    PyObject *jsonModuleString, *jsonModule, *jsonLoadsFunction, *statsAsString, *statsDict;
+
+    PyEval_RestoreThread(self->thread_state);
+
+    // Convert json *char to python dict
+    jsonModuleString = PyUnicode_FromString((char*)"json");
+    jsonModule = PyImport_Import(jsonModuleString);
+    jsonLoadsFunction = PyObject_GetAttrString(jsonModule,(char*)"loads");
+    statsAsString = Py_BuildValue("(s)", json);
+    statsDict = PyObject_CallObject(jsonLoadsFunction, statsAsString);
+
+    // Cleanup python objects
+    Py_DECREF(statsAsString);
+    Py_DECREF(jsonModuleString);
+    Py_DECREF(jsonModule);
+    Py_DECREF(jsonLoadsFunction);
+
+    args = Py_BuildValue("(O)", statsDict);
+    Py_DECREF(statsDict);
+
+    if (self->on_stats) {
+	    result = PyObject_CallObject(self->on_stats, args);
+	    if (result)
+		    Py_DECREF(result);
+		else {
+		    self->callback_crashed++;
+		    rd_kafka_yield(rk);
+	    }
+    }
+    Py_DECREF(args);
+
+    self->thread_state = PyEval_SaveThread();
+    return 0;
+}
 
 static PyObject *Producer_new (PyTypeObject *type, PyObject *args,
 				   PyObject *kwargs) {
@@ -499,7 +541,7 @@ static PyObject *Producer_new (PyTypeObject *type, PyObject *args,
 	}
 
 	rd_kafka_conf_set_dr_msg_cb(conf, dr_msg_cb);
-
+	rd_kafka_conf_set_stats_cb(conf, Producer_stats_cb);
 	self->rk = rd_kafka_new(RD_KAFKA_PRODUCER, conf,
 				errstr, sizeof(errstr));
 	if (!self->rk) {
@@ -511,6 +553,5 @@ static PyObject *Producer_new (PyTypeObject *type, PyObject *args,
 
 	return (PyObject *)self;
 }
-
 
 
