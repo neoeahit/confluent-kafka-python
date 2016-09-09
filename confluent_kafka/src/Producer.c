@@ -487,7 +487,7 @@ PyTypeObject ProducerType = {
 
 static int Producer_stats_cb (rd_kafka_t *rk, char *json,
 				   size_t json_len, void *opaque) {
-    Consumer *self = opaque;
+    Producer *self = opaque;
     PyObject *args, *result;
     PyObject *jsonModuleString, *jsonModule, *jsonLoadsFunction, *statsAsString, *statsDict;
 
